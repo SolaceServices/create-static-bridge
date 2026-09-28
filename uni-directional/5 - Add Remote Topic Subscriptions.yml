@@ -1,0 +1,29 @@
+info:
+  name: 5 - Add Remote Topic Subscriptions
+  type: http
+  seq: 8
+
+http:
+  method: POST
+  url: "{{consumer-url}}/config/msgVpns/{{consumer-vpn}}/bridges/{{bridge-name}},auto/remoteSubscriptions"
+  body:
+    type: json
+    data: |-
+      {
+        "bridgeName": "{{bridge-name}}",
+        "bridgeVirtualRouter": "auto",
+        "msgVpnName": "{{consumer-vpn}}",
+        "remoteSubscriptionTopic": "{{bridge-topics}}",
+        "deliverAlwaysEnabled": true
+      }
+  auth:
+    type: basic
+    username: "{{consumer-admin}}"
+    password: "{{consumer-admin-password}}"
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

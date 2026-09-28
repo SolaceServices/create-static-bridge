@@ -1,0 +1,28 @@
+info:
+  name: 2a - Create Bridge User Producer
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{producer-url}}/config/msgVpns/{{producer-vpn}}/clientUsernames"
+  body:
+    type: json
+    data: |-
+      {
+        "clientUsername": "{{producer-user}}",
+        "msgVpnName": "{{producer-vpn}}",
+        "password": "{{producer-password}}",
+        "enabled": true
+      }
+  auth:
+    type: basic
+    username: "{{producer-admin}}"
+    password: "{{producer-admin-password}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

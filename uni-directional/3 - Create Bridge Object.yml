@@ -1,0 +1,31 @@
+info:
+  name: 3 - Create Bridge Object
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{consumer-url}}/config/msgVpns/{{consumer-vpn}}/bridges"
+  body:
+    type: json
+    data: |-
+      {
+        "bridgeName": "{{bridge-name}}",
+        "bridgeVirtualRouter": "auto",
+        "msgVpnName": "{{consumer-vpn}}",
+        "enabled": false,
+        "remoteAuthenticationScheme": "basic",
+        "remoteAuthenticationBasicClientUsername": "{{producer-user}}",
+        "remoteAuthenticationBasicPassword": "{{producer-password}}"
+      }
+  auth:
+    type: basic
+    username: "{{consumer-admin}}"
+    password: "{{consumer-admin-password}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

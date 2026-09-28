@@ -1,0 +1,27 @@
+info:
+  name: 1b - Create Queue Subscriptions
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{producer-url}}/config/msgVpns/{{producer-vpn}}/queues/{{bridge-queue}}/subscriptions"
+  body:
+    type: json
+    data: |-
+      {
+        "queueName": "{{bridge-queue}}",
+        "msgVpnName": "{{producer-vpn}}",
+        "subscriptionTopic": "{{bridge-topics}}"
+      }
+  auth:
+    type: basic
+    username: "{{producer-admin}}"
+    password: "{{producer-admin-password}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

@@ -1,0 +1,30 @@
+info:
+  name: 1a - Create Bridge Queue
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{producer-url}}/config/msgVpns/{{producer-vpn}}/queues"
+  body:
+    type: json
+    data: |-
+      {
+        "queueName": "{{bridge-queue}}",
+        "msgVpnName": "{{producer-vpn}}",
+        "accessType": "exclusive",
+        "egressEnabled": true,
+        "ingressEnabled": true,
+        "permission": "consume"
+      }
+  auth:
+    type: basic
+    username: "{{producer-admin}}"
+    password: "{{producer-admin-password}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

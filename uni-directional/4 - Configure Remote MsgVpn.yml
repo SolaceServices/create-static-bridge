@@ -1,0 +1,34 @@
+info:
+  name: 4 - Configure Remote MsgVpn
+  type: http
+  seq: 7
+
+http:
+  method: POST
+  url: "{{consumer-url}}/config/msgVpns/{{consumer-vpn}}/bridges/{{bridge-name}},auto/remoteMsgVpns"
+  body:
+    type: json
+    data: |-
+      {
+        "bridgeName": "{{bridge-name}}",
+        "bridgeVirtualRouter": "auto",
+        "msgVpnName": "{{consumer-vpn}}",
+        "remoteMsgVpnName": "{{producer-vpn}}",
+        "remoteMsgVpnLocation": "{{producer-base-url}}",
+        "remoteMsgVpnInterface": "",
+        "enabled": true,
+        "tlsEnabled": true,
+        "compressedDataEnabled": false,
+        "queueBinding": "{{bridge-queue}}"
+      }
+  auth:
+    type: basic
+    username: "{{consumer-admin}}"
+    password: "{{consumer-admin-password}}"
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

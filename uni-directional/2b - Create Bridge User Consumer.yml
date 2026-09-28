@@ -1,0 +1,28 @@
+info:
+  name: 2b - Create Bridge User Consumer
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{consumer-url}}/config/msgVpns/{{consumer-vpn}}/clientUsernames"
+  body:
+    type: json
+    data: |-
+      {
+        "clientUsername": "{{consumer-user}}",
+        "msgVpnName": "{{consumer-vpn}}",
+        "password": "{{consumer-password}}",
+        "enabled": true
+      }
+  auth:
+    type: basic
+    username: "{{consumer-admin}}"
+    password: "{{consumer-admin-password}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
