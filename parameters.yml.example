@@ -1,0 +1,49 @@
+name: [your profile name]
+variables:
+  - name: consumer-url
+    value: https://mr-connection-[service-id consumer].messaging.solace.cloud:943/SEMP/v2
+    description: ""
+  - name: consumer-admin
+    value: mission-control-manager
+    description: ""
+  - name: consumer-vpn
+    value: [messageVPN consumer]
+    description: ""
+  - name: producer-url
+    value: https://mr-connection-[service-id producer].messaging.solace.cloud:943/SEMP/v2
+    description: ""
+  - name: producer-admin
+    value: mission-control-manager
+    description: ""
+  - name: producer-vpn
+    value: [messageVPN producer]
+    description: ""
+  - name: bridge-name
+    value: [bridge name]
+    description: ""
+  - name: producer-base-url
+    value: mr-connection-[service-id producer].messaging.solace.cloud:55443
+    description: ""
+  - name: consumer-base-url
+    value: mr-connection-[service-id consumer].messaging.solace.cloud:55443
+    description: ""
+  - name: bridge-queue
+    value: [bridge queueName]
+    description: ""
+  - name: bridge-topics
+    value: [comma separated list of bridge topics]
+    description: ""
+  - name: consumer-user
+    value: [consumer clientUsername]
+    description: ""
+  - name: producer-user
+    value: [producer clientUsername]
+    description: ""
+  - secret: true
+    name: producer-admin-password
+  - secret: true
+    name: consumer-admin-password
+  - secret: true
+    name: consumer-password
+  - secret: true
+    name: producer-password
