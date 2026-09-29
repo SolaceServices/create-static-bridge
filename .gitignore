@@ -1,3 +1,5 @@
 .env
 parameters.yml
 __pycache__/
+.trust_store_cache/
+.venv/

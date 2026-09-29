@@ -3,12 +3,19 @@
 
 Usage:
     python run_bridge_setup.py --generate-env         # (re)generate .env from parameters.yml
-    python run_bridge_setup.py                        # uni-directional: producer -> consumer
+    python run_bridge_setup.py                        # persistent, uni-directional
     python run_bridge_setup.py --type=bi-directional  # also create the reverse bridge
+    python run_bridge_setup.py --delivery=direct      # skip the bridge queue steps
 
---type=bi-directional runs the same 1a,1b,2,3,4,5,6,7 sequence twice: once
-as-is, then again with the producer/consumer variables swapped, so a second
-bridge is created carrying traffic the other way.
+--type=bi-directional runs the same steps twice: once as-is, then again with
+the producer/consumer variables swapped, so a second bridge is created
+carrying traffic the other way.
+
+--delivery selects which delivery steps run (default: persistent):
+  persistent  1a,1b,2,3,4,6,7  - guaranteed delivery via the bridge queue,
+              skips step 5 (remote topic subscriptions on the bridge)
+  direct      2,3,4,5,6,7      - skips 1a,1b (no bridge queue), uses step 5's
+              remote topic subscriptions for direct (non-guaranteed) delivery
 
 Requires: pip install pyyaml requests
 """
@@ -26,10 +33,10 @@ import yaml
 
 BASE_DIR = Path(__file__).resolve().parent
 PARAMETERS_YML = BASE_DIR / "parameters.yml"
-STEP_DIR = BASE_DIR / "uni-directional"
+STEP_DIR = BASE_DIR / "steps"
 ENV_FILE = BASE_DIR / ".env"
 
-STEPS = [
+BASE_STEPS = [
     "1a - Create Bridge Queue.yml",
     "1b - Create Queue Subscriptions.yml",
     "2 - Create Bridge User.yml",
@@ -40,6 +47,18 @@ STEPS = [
     "7 - Verify Bridge.yml",
 ]
 
+# Steps skipped for each --delivery.
+MODE_SKIP_STEPS = {
+    "persistent": {"5 - Add Remote Topic Subscriptions.yml"},
+    "direct": {"1a - Create Bridge Queue.yml", "1b - Create Queue Subscriptions.yml"},
+}
+
+
+def steps_for_mode(mode: str) -> list[str]:
+    skip = MODE_SKIP_STEPS[mode]
+    return [step for step in BASE_STEPS if step not in skip]
+
+
 VAR_PATTERN = re.compile(r"\{\{([\w.-]+)\}\}")
 
 # Steps whose JSON body carries a topic field that may be a comma-separated
@@ -47,6 +66,14 @@ VAR_PATTERN = re.compile(r"\{\{([\w.-]+)\}\}")
 MULTI_TOPIC_FIELDS = {
     "1b - Create Queue Subscriptions.yml": "subscriptionTopic",
     "5 - Add Remote Topic Subscriptions.yml": "remoteSubscriptionTopic",
+}
+
+# JSON body fields to drop for a given step, per --delivery. Used to omit
+# queueBinding in direct mode, since no bridge queue exists to bind to.
+OMIT_FIELDS_BY_MODE = {
+    "4 - Configure Remote MsgVpn.yml": {
+        "direct": ["queueBinding"],
+    },
 }
 
 # Variable pairs to swap when creating the reverse bridge for --type=bi-directional.
@@ -174,7 +201,7 @@ def send_request(
     print()
 
 
-def run_step(path: Path, context: dict[str, str], session: requests.Session) -> None:
+def run_step(path: Path, context: dict[str, str], session: requests.Session, mode: str) -> None:
     spec = yaml.safe_load(path.read_text())
     http = spec["http"]
     name = spec["info"]["name"]
@@ -194,6 +221,10 @@ def run_step(path: Path, context: dict[str, str], session: requests.Session) -> 
     body = http.get("body")
     if body and body.get("type") == "json":
         json_body = json.loads(render(body["data"], context))
+
+    for field in OMIT_FIELDS_BY_MODE.get(path.name, {}).get(mode, []):
+        if json_body:
+            json_body.pop(field, None)
 
     topic_field = MULTI_TOPIC_FIELDS.get(path.name)
     if topic_field and json_body and topic_field in json_body:
@@ -219,6 +250,13 @@ def main() -> None:
         help="uni-directional (default) creates one bridge; bi-directional also "
         "creates the reverse bridge by swapping producer/consumer",
     )
+    parser.add_argument(
+        "--delivery",
+        choices=["persistent", "direct"],
+        default="persistent",
+        help="persistent (default) uses the bridge queue and skips step 5; "
+        "direct skips the bridge queue steps (1a,1b) and uses step 5 instead",
+    )
     args = parser.parse_args()
 
     if args.generate_env or not ENV_FILE.exists():
@@ -230,18 +268,19 @@ def main() -> None:
 
     variables = load_parameters()
     context = build_context(load_existing_env(), variables)
+    steps = steps_for_mode(args.delivery)
 
     session = requests.Session()
 
     print("=== Creating bridge: producer -> consumer ===\n")
-    for step_name in STEPS:
-        run_step(STEP_DIR / step_name, context, session)
+    for step_name in steps:
+        run_step(STEP_DIR / step_name, context, session, args.delivery)
 
     if args.type == "bi-directional":
         print("=== Creating reverse bridge: consumer -> producer ===\n")
         reverse_context = swap_producer_consumer(context)
-        for step_name in STEPS:
-            run_step(STEP_DIR / step_name, reverse_context, session)
+        for step_name in steps:
+            run_step(STEP_DIR / step_name, reverse_context, session, args.delivery)
 
     print("All steps completed successfully.")
 

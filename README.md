@@ -2,7 +2,7 @@
 
 Automates the SEMP v2 API calls needed to create a uni-directional Solace bridge
 between two message VPNs ("producer" and "consumer"), using the request
-definitions in [uni-directional/](uni-directional/) and the variables in
+definitions in [steps/](steps/) and the variables in
 [parameters.yml](parameters.yml).
 
 The bridge authenticates to the producer using the existing `producer-user`
@@ -16,12 +16,12 @@ the steps in order performs the following against the two Solace brokers:
 
 | Step | File | Action | Runs against |
 |------|------|--------|---------------|
-| 1a | `1a - Create Bridge Queue.yml` | Create the queue the bridge will read from | producer |
-| 1b | `1b - Create Queue Subscriptions.yml` | Add a topic subscription to that queue | producer |
+| 1a | `1a - Create Bridge Queue.yml` | Create the queue the bridge will read from (only for persistent messaging) | producer |
+| 1b | `1b - Create Queue Subscriptions.yml` | Add a topic subscription to that queue (only for persistent messaging) | producer |
 | 2 | `2 - Create Bridge User.yml` | Create the producer-side client username | producer |
 | 3 | `3 - Create Bridge Object.yml` | Create the bridge object (disabled) | consumer |
 | 4 | `4 - Configure Remote MsgVpn.yml` | Point the bridge at the producer VPN/queue | consumer |
-| 5 | `5 - Add Remote Topic Subscriptions.yml` | Add the remote topic subscription | consumer |
+| 5 | `5 - Add Remote Topic Subscriptions.yml` | Add the remote topic subscription `(only for direct messaging) | consumer |
 | 6 | `6 - Enable Bridge.yml` | Enable the bridge | consumer |
 | 7 | `7 - Verify Bridge.yml` | Confirm the bridge is up | consumer |
 
@@ -32,9 +32,23 @@ list, so every topic ends up subscribed on both the queue and the bridge.
 ## Prerequisites
 
 - Python 3.9+
-- `pip install pyyaml requests`
 - Two reachable Solace brokers (producer and consumer) with SEMP v2 admin
   access, and their management URLs/admin credentials.
+
+### Virtual environment
+
+Create and activate a virtual environment, then install everything from
+[requirements.txt](requirements.txt) (covers `run_bridge_setup.py`,
+`teardown_bridge.py`, and `test_bridge.py`):
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+Re-activate it (`source .venv/bin/activate`) in any new shell before running
+the scripts below. `.venv/` should not be committed — see `.gitignore`.
 
 ## Setup
 1. **Prepare the `parameters.yml` file**:
@@ -75,10 +89,10 @@ Make sure to full in the topics that need to be moved over the bridge
    Each step prints its request method/URL, the response status, and the
    response body, then stops immediately if any step fails.
 
-   Pass `--type=bi-directional` to also create the reverse bridge:
+   Pass `--type bi-directional` to also create the reverse bridge:
 
    ```bash
-   python3 run_bridge_setup.py --type=bi-directional
+   python3 run_bridge_setup.py --type bi-directional
    ```
 
    A Solace bridge is inherently one-directional, so a bi-directional link is
@@ -86,6 +100,64 @@ Make sure to full in the topics that need to be moved over the bridge
    1a,1b,2,3,4,5,6,7 once as-is (producer → consumer), then runs them again
    with the producer/consumer variables swapped (consumer → producer) — the
    swapped run's step 2 creates the client username on the consumer side.
+
+   Pass `--delivery` to choose how messages are delivered across the bridge
+   (default: `persistent`):
+
+   ```bash
+   python3 run_bridge_setup.py --delivery persistent  # default
+   python3 run_bridge_setup.py --delivery direct
+   ```
+
+   | Delivery | Steps run | Skips |
+   |------|-----------|-------|
+   | `persistent` (default) | 1a,1b,2,3,4,6,7 | 5 — guaranteed delivery via the bridge queue, no remote topic subscriptions needed |
+   | `direct` | 2,3,4,5,6,7 | 1a,1b — no bridge queue; step 5's remote topic subscriptions carry messages directly |
+
+   In `direct` mode, step 4 also omits `queueBinding` from its payload, since
+   no bridge queue exists to bind to.
+
+## Testing the bridge
+
+`test_bridge.py` is a separate, standalone script that publishes a message on
+the producer broker and waits to receive it on the consumer broker, to
+confirm the bridge is actually forwarding traffic. It connects as
+`PRODUCER_USER`/`CONSUMER_USER` (the client usernames from `parameters.yml`,
+not the SEMP admin credentials) over the messaging ports
+(`PRODUCER_BASE_URL`/`CONSUMER_BASE_URL`).
+
+```bash
+python3 test_bridge.py                          # persistent delivery, first BRIDGE_TOPICS entry
+python3 test_bridge.py --topic orders/test      # publish/subscribe on a specific topic
+python3 test_bridge.py --delivery direct
+python3 test_bridge.py --timeout 15
+```
+
+By default it takes the first entry in `BRIDGE_TOPICS` as the subscription
+pattern; if it ends in `/>`, it publishes on a concrete topic underneath it
+(e.g. `orders/bridge-test-<id>`) so the wildcard still matches. Use `--topic`
+to test an exact topic instead. `--delivery` here should match the
+`--delivery` `run_bridge_setup.py` was run with (`persistent`, the default,
+or `direct`).
+
+`CONSUMER_USER` is only ever created by the reverse pass of
+`run_bridge_setup.py --type=bi-directional` — a plain run never creates it, so
+connecting as it will fail with an authentication error. Pass `--ensure-users`
+to have `test_bridge.py` create `PRODUCER_USER`/`CONSUMER_USER` via SEMP
+(using the admin credentials) on their respective VPNs first, if missing:
+
+```bash
+python3 test_bridge.py --ensure-users
+```
+
+Its extra dependencies (`solace-pubsubplus`, `requests`, `certifi`) are
+already covered by `requirements.txt` above.
+
+The Solace client library needs a trust store *directory* of individual PEM
+files to validate the broker's TLS certificate, not a single bundle file.
+On first run, `test_bridge.py` splits `certifi`'s CA bundle into one file per
+certificate under `.trust_store_cache/` (gitignored) and reuses it on later
+runs.
 
 ## Tearing down
 
@@ -104,10 +176,12 @@ to actually perform the deletions:
 ```bash
 python3 teardown_bridge.py                        # dry run
 python3 teardown_bridge.py --yes                   # actually delete
-python3 teardown_bridge.py --type=bi-directional --yes  # also tear down the reverse bridge
+python3 teardown_bridge.py --type bi-directional --yes  # also tear down the reverse bridge
 ```
 
-A 404 on delete is treated as "already gone" and not an error, so it's safe
+A missing object on delete — a real 404, or SEMP v2's HTTP 400 with
+`meta.error.status: NOT_FOUND` (what it actually returns) — is treated as
+"already gone" and not an error, so it's safe
 to re-run.
 
 ## Re-running
@@ -115,3 +189,24 @@ to re-run.
 `--generate-env` is idempotent: it won't overwrite values you've already set
 in `.env`, so it's safe to re-run after adding a new variable to
 `parameters.yml`.
+
+
+## Full cycle test persistent messaging uni-directional
+
+```
+python3 run_bridge_setup.py
+
+python test_bridge.py
+
+python teardown_bridge.py --yes
+```
+
+## Full cycle test direct messaging uni-directional
+
+```
+python3 run_bridge_setup.py --delivery direct
+
+python test_bridge.py --delivery direct
+
+python teardown_bridge.py --yes
+```

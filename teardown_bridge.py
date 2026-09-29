@@ -161,7 +161,7 @@ def delete(
     response = session.request(method, url, auth=auth, timeout=30)
     print(f"Status: {response.status_code}")
 
-    if response.status_code == 404:
+    if response.status_code == 404 or is_not_found_error(response):
         print("Not found - already deleted, skipping.\n")
         return
 
@@ -170,6 +170,15 @@ def delete(
         raise SystemExit(f"'{label}' failed with status {response.status_code}")
 
     print()
+
+
+def is_not_found_error(response: requests.Response) -> bool:
+    """SEMP v2 reports a missing object as HTTP 400 with meta.error.status == NOT_FOUND."""
+    try:
+        error = response.json().get("meta", {}).get("error", {})
+    except ValueError:
+        return False
+    return error.get("status") == "NOT_FOUND"
 
 
 def run_teardown(context: dict[str, str], session: requests.Session, execute: bool) -> None:
