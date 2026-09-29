@@ -4,12 +4,12 @@
 Usage:
     python run_bridge_setup.py --generate-env         # (re)generate .env from parameters.yml
     python run_bridge_setup.py                        # persistent, uni-directional
-    python run_bridge_setup.py --type=bi-directional  # also create the reverse bridge
+    python run_bridge_setup.py --direction=bi         # also create the reverse bridge
     python run_bridge_setup.py --delivery=direct      # skip the bridge queue steps
 
---type=bi-directional runs the same steps twice: once as-is, then again with
-the producer/consumer variables swapped, so a second bridge is created
-carrying traffic the other way.
+--direction=bi runs the same steps twice: once as-is, then again with the
+producer/consumer variables swapped, so a second bridge is created carrying
+traffic the other way.
 
 --delivery selects which delivery steps run (default: persistent):
   persistent  1a,1b,2,3,4,6,7  - guaranteed delivery via the bridge queue,
@@ -76,7 +76,7 @@ OMIT_FIELDS_BY_MODE = {
     },
 }
 
-# Variable pairs to swap when creating the reverse bridge for --type=bi-directional.
+# Variable pairs to swap when creating the reverse bridge for --direction=bi.
 SWAP_PAIRS = [
     ("producer-url", "consumer-url"),
     ("producer-admin", "consumer-admin"),
@@ -244,11 +244,11 @@ def main() -> None:
         help="(Re)generate .env from parameters.yml and exit without running any steps",
     )
     parser.add_argument(
-        "--type",
-        choices=["uni-directional", "bi-directional"],
-        default="uni-directional",
-        help="uni-directional (default) creates one bridge; bi-directional also "
-        "creates the reverse bridge by swapping producer/consumer",
+        "--direction",
+        choices=["uni", "bi"],
+        default="uni",
+        help="uni (default) creates one bridge; bi also creates the reverse "
+        "bridge by swapping producer/consumer",
     )
     parser.add_argument(
         "--delivery",
@@ -276,7 +276,7 @@ def main() -> None:
     for step_name in steps:
         run_step(STEP_DIR / step_name, context, session, args.delivery)
 
-    if args.type == "bi-directional":
+    if args.direction == "bi":
         print("=== Creating reverse bridge: consumer -> producer ===\n")
         reverse_context = swap_producer_consumer(context)
         for step_name in steps:

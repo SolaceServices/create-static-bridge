@@ -77,7 +77,7 @@ Make sure to full in the topics that need to be moved over the bridge
 
    `CONSUMER_USER`/`CONSUMER_PASSWORD` aren't used by any step in a plain
    uni-directional run (no step creates that client username), but they're
-   required for `--type=bi-directional` below — the reverse pass's step 2
+   required for `--direction bi` below — the reverse pass's step 2
    creates that username on the consumer side. Fill them in regardless.
 
 4. **Run the setup**:
@@ -89,10 +89,10 @@ Make sure to full in the topics that need to be moved over the bridge
    Each step prints its request method/URL, the response status, and the
    response body, then stops immediately if any step fails.
 
-   Pass `--type bi-directional` to also create the reverse bridge:
+   Pass `--direction bi` to also create the reverse bridge:
 
    ```bash
-   python3 run_bridge_setup.py --type bi-directional
+   python3 run_bridge_setup.py --direction bi
    ```
 
    A Solace bridge is inherently one-directional, so a bi-directional link is
@@ -141,7 +141,7 @@ to test an exact topic instead. `--delivery` here should match the
 or `direct`).
 
 `CONSUMER_USER` is only ever created by the reverse pass of
-`run_bridge_setup.py --type=bi-directional` — a plain run never creates it, so
+`run_bridge_setup.py --direction bi` — a plain run never creates it, so
 connecting as it will fail with an authentication error. Pass `--ensure-users`
 to have `test_bridge.py` create `PRODUCER_USER`/`CONSUMER_USER` via SEMP
 (using the admin credentials) on their respective VPNs first, if missing:
@@ -176,7 +176,7 @@ to actually perform the deletions:
 ```bash
 python3 teardown_bridge.py                        # dry run
 python3 teardown_bridge.py --yes                   # actually delete
-python3 teardown_bridge.py --type bi-directional --yes  # also tear down the reverse bridge
+python3 teardown_bridge.py --direction bi --yes  # also tear down the reverse bridge
 ```
 
 A missing object on delete — a real 404, or SEMP v2's HTTP 400 with

@@ -12,9 +12,9 @@ On the consumer:
   - the bridge object (bridge-name) — this also removes its remoteMsgVpn and
     remoteSubscriptions sub-resources, so those don't need separate deletes.
 
-With --type=bi-directional, also deletes the reverse-direction resources
+With --direction=bi, also deletes the reverse-direction resources
 (producer/consumer roles swapped), matching what
-`run_bridge_setup.py --type=bi-directional` created.
+`run_bridge_setup.py --direction=bi` created.
 
 This is destructive and talks to real brokers. By default it only prints what
 it WOULD delete. Pass --yes to actually perform the deletions.
@@ -22,7 +22,7 @@ it WOULD delete. Pass --yes to actually perform the deletions.
 Usage:
     python teardown_bridge.py                        # dry run (no deletes)
     python teardown_bridge.py --yes                  # actually delete
-    python teardown_bridge.py --type=bi-directional --yes
+    python teardown_bridge.py --direction=bi --yes
 
 Requires: pip install pyyaml requests
 """
@@ -189,11 +189,11 @@ def run_teardown(context: dict[str, str], session: requests.Session, execute: bo
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--type",
-        choices=["uni-directional", "bi-directional"],
-        default="uni-directional",
-        help="Match the --type used with run_bridge_setup.py, so the reverse-direction "
-        "resources are torn down too",
+        "--direction",
+        choices=["uni", "bi"],
+        default="uni",
+        help="Match the --direction used with run_bridge_setup.py, so the "
+        "reverse-direction resources are torn down too",
     )
     parser.add_argument(
         "--yes",
@@ -214,7 +214,7 @@ def main() -> None:
     print("=== Tearing down bridge: producer -> consumer ===\n")
     run_teardown(context, session, execute=args.yes)
 
-    if args.type == "bi-directional":
+    if args.direction == "bi":
         print("=== Tearing down reverse bridge: consumer -> producer ===\n")
         run_teardown(swap_producer_consumer(context), session, execute=args.yes)
 
