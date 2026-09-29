@@ -1,4 +1,4 @@
-# Broker Bridge Setup
+# Static Bridge Setup
 
 Automates the SEMP v2 API calls needed to create a uni-directional Solace bridge
 between two message VPNs ("producer" and "consumer"), using the request
