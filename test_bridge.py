@@ -11,12 +11,11 @@ Usage:
     python test_bridge.py --topic orders/test     # publish/subscribe on a specific topic
     python test_bridge.py --delivery direct
     python test_bridge.py --timeout 15
-    python test_bridge.py --ensure-users          # create producer-user/consumer-user first, if missing
 
---ensure-users creates PRODUCER_USER/CONSUMER_USER via SEMP v2 (using the
-admin credentials) on their respective VPNs if they don't already exist yet.
-A plain `run_bridge_setup.py` run only creates PRODUCER_USER; CONSUMER_USER is
-otherwise only created by the reverse pass of `--type=bi-directional`.
+Before connecting, PRODUCER_USER/CONSUMER_USER are created via SEMP v2 (using
+the admin credentials) on their respective VPNs if they don't already exist
+yet. A plain `run_bridge_setup.py` run only creates PRODUCER_USER; CONSUMER_USER
+is otherwise only created by the reverse pass of `--type=bi-directional`.
 
 Requires: pip install pyyaml requests solace-pubsubplus certifi
 """
@@ -129,7 +128,6 @@ def ensure_client_username(
     response = requests.get(f"{semp_url}/config/msgVpns/{vpn}/clientUsernames/{username}", auth=auth, timeout=30)
 
     if response.ok:
-        print(f"Client username '{username}' already exists on {vpn}.")
         return
 
     if not is_not_found_error(response):
@@ -239,35 +237,28 @@ def main() -> None:
         default=None,
         help="Payload to send (default: a generated string with a random id)",
     )
-    parser.add_argument(
-        "--ensure-users",
-        action="store_true",
-        help="Create PRODUCER_USER/CONSUMER_USER via SEMP on their respective VPNs "
-        "if they don't already exist, before connecting",
-    )
     args = parser.parse_args()
 
     variables = load_parameters()
     context = build_context(load_env(), variables)
 
-    if args.ensure_users:
-        ensure_client_username(
-            context["producer-url"],
-            context["producer-vpn"],
-            context["producer-admin"],
-            context["producer-admin-password"],
-            context["producer-user"],
-            context["producer-password"],
-        )
-        ensure_client_username(
-            context["consumer-url"],
-            context["consumer-vpn"],
-            context["consumer-admin"],
-            context["consumer-admin-password"],
-            context["consumer-user"],
-            context["consumer-password"],
-        )
-        print()
+    ensure_client_username(
+        context["producer-url"],
+        context["producer-vpn"],
+        context["producer-admin"],
+        context["producer-admin-password"],
+        context["producer-user"],
+        context["producer-password"],
+    )
+    ensure_client_username(
+        context["consumer-url"],
+        context["consumer-vpn"],
+        context["consumer-admin"],
+        context["consumer-admin-password"],
+        context["consumer-user"],
+        context["consumer-password"],
+    )
+    print()
 
     if args.topic:
         subscribe_pattern = publish_topic = args.topic
