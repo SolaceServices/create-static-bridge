@@ -141,14 +141,10 @@ to test an exact topic instead. `--delivery` here should match the
 or `direct`).
 
 `CONSUMER_USER` is only ever created by the reverse pass of
-`run_bridge_setup.py --direction bi` — a plain run never creates it, so
-connecting as it will fail with an authentication error. Pass `--ensure-users`
-to have `test_bridge.py` create `PRODUCER_USER`/`CONSUMER_USER` via SEMP
-(using the admin credentials) on their respective VPNs first, if missing:
-
-```bash
-python3 test_bridge.py --ensure-users
-```
+`run_bridge_setup.py --direction bi` — a plain run never creates it. To avoid
+an authentication error, `test_bridge.py` always creates
+`PRODUCER_USER`/`CONSUMER_USER` via SEMP (using the admin credentials) on
+their respective VPNs first, if missing, before connecting.
 
 Its extra dependencies (`solace-pubsubplus`, `requests`, `certifi`) are
 already covered by `requirements.txt` above.
