@@ -6,6 +6,7 @@ Usage:
     python run_bridge_setup.py                        # persistent, uni-directional
     python run_bridge_setup.py --direction=bi         # also create the reverse bridge
     python run_bridge_setup.py --delivery=direct      # skip the bridge queue steps
+    python run_bridge_setup.py --parameters=custom.yml  # use a different parameters file
 
 --direction=bi runs the same steps twice: once as-is, then again with the
 producer/consumer variables swapped, so a second bridge is created carrying
@@ -92,8 +93,8 @@ def env_key(var_name: str) -> str:
     return var_name.upper().replace("-", "_")
 
 
-def load_parameters() -> list[dict]:
-    with PARAMETERS_YML.open() as f:
+def load_parameters(parameters_path: Path = PARAMETERS_YML) -> list[dict]:
+    with parameters_path.open() as f:
         data = yaml.safe_load(f)
     return data["variables"]
 
@@ -111,12 +112,12 @@ def load_existing_env() -> dict[str, str]:
     return values
 
 
-def generate_env_file() -> None:
-    variables = load_parameters()
+def generate_env_file(parameters_path: Path = PARAMETERS_YML) -> None:
+    variables = load_parameters(parameters_path)
     existing = load_existing_env()
 
     lines = [
-        "# Generated from parameters.yml",
+        f"# Generated from {parameters_path.name}",
         "# Fill in the secret values below (they are left blank) before running",
         "# run_bridge_setup.py without --generate-env.",
         "",
@@ -125,10 +126,8 @@ def generate_env_file() -> None:
         name = var["name"]
         key = env_key(name)
         is_secret = bool(var.get("secret", False))
-        if key in existing:
-            value = existing[key]
-        elif is_secret:
-            value = ""
+        if is_secret:
+            value = existing.get(key, "")
         else:
             value = var.get("value", "")
         marker = "  # secret - fill in" if is_secret and not value else ""
@@ -257,16 +256,22 @@ def main() -> None:
         help="persistent (default) uses the bridge queue and skips step 5; "
         "direct skips the bridge queue steps (1a,1b) and uses step 5 instead",
     )
+    parser.add_argument(
+        "--parameters",
+        type=Path,
+        default=PARAMETERS_YML,
+        help="Path to the parameters YAML file (default: parameters.yml)",
+    )
     args = parser.parse_args()
 
     if args.generate_env or not ENV_FILE.exists():
-        generate_env_file()
+        generate_env_file(args.parameters)
         if args.generate_env:
             return
         print(f"Fill in the secret values in {ENV_FILE} and re-run this script.")
         return
 
-    variables = load_parameters()
+    variables = load_parameters(args.parameters)
     context = build_context(load_existing_env(), variables)
     steps = steps_for_mode(args.delivery)
 
