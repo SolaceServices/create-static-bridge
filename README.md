@@ -117,6 +117,23 @@ Make sure to full in the topics that need to be moved over the bridge
    In `direct` mode, step 4 also omits `queueBinding` from its payload, since
    no bridge queue exists to bind to.
 
+### Alternative: `run_bridge_setup.sh`
+
+`run_bridge_setup.sh` is a curl/jq equivalent of `run_bridge_setup.py`, for
+when a plain shell script running raw SEMP v2 calls is more useful than the
+Python step-runner (e.g. to read or tweak the requests directly). It reads
+the same `.env` file, so steps 1-3 above still apply — generate `.env` with
+the Python script first. Requires `curl` and `jq`.
+
+```bash
+./run_bridge_setup.sh                       # persistent, uni-directional
+./run_bridge_setup.sh --direction bi        # also create the reverse bridge
+./run_bridge_setup.sh --delivery direct     # skip the bridge queue steps
+```
+
+It supports the same `--direction` and `--delivery` flags, with the same
+step-skipping and field-omission behavior described above.
+
 ## Testing the bridge
 
 `test_bridge.py` is a separate, standalone script that publishes a message on
@@ -155,6 +172,37 @@ On first run, `test_bridge.py` splits `certifi`'s CA bundle into one file per
 certificate under `.trust_store_cache/` (gitignored) and reuses it on later
 runs.
 
+### Alternative: `test_bridge_sdkperf.sh`
+
+`test_bridge_sdkperf.sh` is a [SDKPerf](https://network.solace.com/discussion/sdkperf)-based
+equivalent of `test_bridge.py` — same publish/subscribe round-trip test, but
+using Solace's own SDKPerf tool (`sdkperf_java`) instead of the Python
+`solace-pubsubplus` client, for environments where SDKPerf is already the
+go-to tool for talking to a broker. It reads the same `.env` and follows the
+same topic-selection logic.
+
+```bash
+./test_bridge_sdkperf.sh                          # persistent delivery, first BRIDGE_TOPICS entry
+./test_bridge_sdkperf.sh --topic orders/test      # publish/subscribe on a specific topic
+./test_bridge_sdkperf.sh --delivery direct
+./test_bridge_sdkperf.sh --timeout 15
+```
+
+Requires SDKPerf for Java (`sdkperf_java.sh`) — set `SDKPERF_JAVA` to its
+path, or install it under `~/Development/Tools/sdkperf-jcsmp-*/`, which the
+script checks by default.
+
+It runs the subscriber in the background (a temporary queue endpoint for
+`persistent`, a plain topic subscription for `direct`), publishes one message
+with `-pfl` pointing at a generated payload file, then polls the
+subscriber's `-md` dump for a completed `Start Message`/`End Message` block
+to confirm delivery — a message count check rather than matching the exact
+payload text, since the dump's hex/ASCII format wraps the payload across
+several lines. Unlike `test_bridge.py`, it does **not** validate the
+broker's TLS certificate (SDKPerf's cert-validation flags default to off) —
+fine for a connectivity check, not a substitute for the Python script's cert
+handling.
+
 ## Tearing down
 
 `teardown_bridge.py` is a separate, standalone script that deletes what
@@ -179,6 +227,19 @@ A missing object on delete — a real 404, or SEMP v2's HTTP 400 with
 `meta.error.status: NOT_FOUND` (what it actually returns) — is treated as
 "already gone" and not an error, so it's safe
 to re-run.
+
+### Alternative: `teardown_bridge.sh`
+
+`teardown_bridge.sh` is a curl/jq equivalent of `teardown_bridge.py`, reading
+the same `.env` and deleting the same three resources. It has the same
+dry-run-by-default behavior and treats a 404 / `NOT_FOUND` the same way.
+Requires `curl` and `jq`.
+
+```bash
+./teardown_bridge.sh                     # dry run
+./teardown_bridge.sh --yes               # actually delete
+./teardown_bridge.sh --direction bi --yes  # also tear down the reverse bridge
+```
 
 ## Re-running
 
